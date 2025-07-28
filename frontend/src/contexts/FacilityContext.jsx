@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useFeatures } from './FeatureContext';
 
 const FacilityContext = createContext();
 
@@ -53,7 +54,7 @@ export const FacilityProvider = ({ children }) => {
   const fetchFacilities = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/facilities');
+      const response = await fetch('http://localhost:5000/api/facilities');
       if (!response.ok) {
         throw new Error('Failed to fetch facilities');
       }
@@ -98,18 +99,63 @@ export const FacilityProvider = ({ children }) => {
     getCurrentFacilityType: () => currentFacility?.type,
     getCurrentFacilityFeatures: () => currentFacility?.features || {},
     
-    // Feature checking helpers
-    hasFeature: (featureName) => {
+    // Feature checking helpers - enhanced with new feature system integration
+    hasFeature: (featureName, useNewSystem = true) => {
+      // Try new feature system first if available
+      if (useNewSystem && typeof window !== 'undefined' && window.useFeatures) {
+        try {
+          const { isFeatureEnabled } = window.useFeatures();
+          return isFeatureEnabled(featureName);
+        } catch (e) {
+          // Fall back to legacy system
+        }
+      }
+      
+      // Legacy feature checking
       if (!currentFacility?.features) return false;
-      return currentFacility.features[featureName] === true;
+      const feature = currentFacility.features[featureName];
+      
+      // Handle both boolean and object structure
+      if (typeof feature === 'boolean') return feature;
+      if (typeof feature === 'object' && feature !== null) return feature.enabled === true;
+      return false;
     },
     
-    // Quick feature checks
-    hasAnalytics: () => currentFacility?.features?.analytics === true,
-    hasInventory: () => currentFacility?.features?.inventory === true,
-    hasSections: () => currentFacility?.features?.sections === true,
-    hasExpiry: () => currentFacility?.features?.expiry === true,
-    hasTemperature: () => currentFacility?.features?.temperature === true,
+    // Legacy feature checks - maintained for backward compatibility
+    hasAnalytics: () => {
+      const feature = currentFacility?.features?.analytics;
+      return feature === true || (feature?.enabled === true);
+    },
+    hasInventory: () => {
+      const feature = currentFacility?.features?.inventory;
+      return feature === true || (feature?.enabled === true);
+    },
+    hasSections: () => {
+      const feature = currentFacility?.features?.sections || currentFacility?.features?.sectionManagement;
+      return feature === true || (feature?.enabled === true);
+    },
+    hasExpiry: () => {
+      const feature = currentFacility?.features?.expiry || currentFacility?.features?.expiryTracking;
+      return feature === true || (feature?.enabled === true);
+    },
+    hasTemperature: () => {
+      const feature = currentFacility?.features?.temperature || currentFacility?.features?.temperatureMonitoring;
+      return feature === true || (feature?.enabled === true);
+    },
+    
+    // New feature system integration
+    hasStorageDesigner: () => {
+      return value.hasFeature('storageDesigner');
+    },
+    hasBatchManagement: () => {
+      return value.hasFeature('batchManagement');
+    },
+    hasQualityControl: () => {
+      return value.hasFeature('qualityControl');
+    },
+    hasDistributionManagement: () => {
+      return value.hasFeature('distributionManagement');
+    },
   };
 
   return (

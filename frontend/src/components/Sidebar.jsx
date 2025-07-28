@@ -2,10 +2,12 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useFacility } from '../contexts/FacilityContext';
+import { useFeatures } from '../contexts/FeatureContext';
 import FacilitySwitcher from './FacilitySwitcher';
 
 function Sidebar() {
   const { hasFeature, currentFacility, changeFacility } = useFacility();
+  const { isFeatureEnabled, FeatureGate } = useFeatures();
   const location = useLocation();
 
   const menuItems = [
@@ -13,78 +15,104 @@ function Sidebar() {
       to: "/dashboard",
       label: "Dashboard",
       icon: "📊",
-      requiredFeatures: []
+      requiredFeatures: [],
+      featureGate: null // Always show
     },
     {
       to: "/products",
       label: "Products",
       icon: "📦",
-      requiredFeatures: [] // Always show Products
+      requiredFeatures: [],
+      featureGate: 'product-management'
     },
     {
-      to: "/storage",
-      label: "Storage",
-      icon: "🏭",
-      requiredFeatures: ['sections']
-    },
-    {
-      to: "/section-manager",
-      label: "Sections",
-      icon: "🗂️",
-      requiredFeatures: ['sections']
+      to: "/storage-designer",
+      label: "Storage Designer",
+      icon: "🏗️",
+      requiredFeatures: ['storage-designer', 'section-management'],
+      featureGate: 'storage-designer',
+      description: "Complete warehouse design & management"
     },
     {
       to: "/rule-manager",
       label: "Rules",
       icon: "📋",
-      requiredFeatures: [] // Always show Rules
+      requiredFeatures: [],
+      featureGate: 'rule-engine'
     },
     {
       to: "/analytics",
       label: "Analytics",
       icon: "📈",
-      requiredFeatures: ['analytics']
+      requiredFeatures: ['analytics-dashboard'],
+      featureGate: 'analytics-dashboard'
     },
     {
       to: "/activity",
       label: "Activity Log",
       icon: "📝",
-      requiredFeatures: [] // Always show Activity Log
+      requiredFeatures: [],
+      featureGate: 'batch-operations'
     },
     {
       to: "/low-stock",
       label: "Low Stock",
       icon: "⚠️",
-      requiredFeatures: ['inventory']
+      requiredFeatures: ['inventory-alerts'],
+      featureGate: 'inventory-alerts'
     },
     {
       to: "/expiring",
       label: "Expiring Products",
       icon: "📅",
-      requiredFeatures: ['expiry']
+      requiredFeatures: ['expiry-management'],
+      featureGate: 'expiry-management'
     },
     {
       to: "/temperature-monitor",
       label: "Temperature Monitor",
       icon: "🌡️",
-      requiredFeatures: ['temperature']
+      requiredFeatures: ['temperature-monitoring'],
+      featureGate: 'temperature-monitoring'
     },
     {
       to: "/purchase-orders",
       label: "Purchase Orders",
       icon: "🛍️",
-      requiredFeatures: []
+      requiredFeatures: [],
+      featureGate: 'batch-operations'
+    }
+  ];
+
+  // Admin menu items
+  const adminMenuItems = [
+    {
+      to: "/admin/features",
+      label: "Feature Toggles",
+      icon: "🎛️",
+      featureGate: 'feature-toggle-admin'
     }
   ];
 
   console.log('All menu items:', menuItems.map(item => ({ label: item.label, to: item.to, features: item.requiredFeatures })));
 
-  // Check if a menu item should be shown based on required features
+  // Check if a menu item should be shown based on required features (legacy)
   const shouldShowMenuItem = (requiredFeatures) => {
     // If no features are required, always show the menu item
     if (!requiredFeatures.length) return true;
     // Show if ALL of the required features are enabled (changed from some to every)
     return requiredFeatures.every(feature => hasFeature(feature));
+  };
+
+  // Check if menu item should show using new feature system
+  const shouldShowMenuItemNew = (item) => {
+    // If no feature gate, use legacy system
+    if (!item.featureGate) {
+      return shouldShowMenuItem(item.requiredFeatures);
+    }
+    
+    // Use new feature system
+    return isFeatureEnabled(item.featureGate);
   };
 
   return (
@@ -115,8 +143,8 @@ function Sidebar() {
       {/* Navigation Menu */}
       <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
         {menuItems.map((item) => {
-          console.log('Processing menu item:', item.label, 'Should show:', shouldShowMenuItem(item.requiredFeatures));
-          if (!shouldShowMenuItem(item.requiredFeatures)) return null;
+          console.log('Processing menu item:', item.label, 'Should show:', shouldShowMenuItemNew(item));
+          if (!shouldShowMenuItemNew(item)) return null;
 
           const isActive = location.pathname === item.to;
           return (
@@ -139,6 +167,37 @@ function Sidebar() {
             </Link>
           );
         })}
+        
+        {/* Admin Section */}
+        <div className="pt-4 mt-4 border-t border-gray-200">
+          <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-4">
+            Administration
+          </div>
+          {adminMenuItems.map((item) => {
+            if (item.featureGate && !isFeatureEnabled(item.featureGate)) return null;
+
+            const isActive = location.pathname === item.to;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`
+                  flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group
+                  ${isActive 
+                    ? 'bg-purple-600 text-white shadow-lg transform scale-105' 
+                    : 'text-gray-600 hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 hover:text-gray-900 hover:scale-105'
+                  }
+                `}
+              >
+                <span className={`text-lg mr-3 ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`}>
+                  {item.icon}
+                </span>
+                <span className="font-semibold">{item.label}</span>
+                {isActive && <span className="ml-auto text-white text-lg">⚙️</span>}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
       
       {/* System Status Footer */}

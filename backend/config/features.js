@@ -115,6 +115,30 @@ const features = {
       "PUT /api/facilities/:id",
       "GET /api/facility-config"
     ]
+  },
+
+  // Storage Designer (Warehouse Layout Management)
+  storageDesigner: {
+    enabled: true,
+    description: "Visual warehouse layout designer with drag-and-drop product placement",
+    version: "3.0.0",
+    requiresFeatures: ["sections", "products"],
+    endpoints: [
+      "GET /api/storage/layout",
+      "PUT /api/storage/layout",
+      "PUT /api/storage/products/:id/location",
+      "GET /api/storage/location/:id/products",
+      "GET /api/storage/utilization",
+      "GET /api/storage/search"
+    ],
+    capabilities: {
+      "2d_view": "2D warehouse layout visualization",
+      "3d_view": "3D warehouse layout visualization (future)",
+      "drag_drop": "Drag and drop product placement",
+      "bulk_assignment": "Bulk product location assignment",
+      "utilization_analytics": "Storage utilization reporting",
+      "location_search": "Advanced location-based product search"
+    }
   }
 };
 
