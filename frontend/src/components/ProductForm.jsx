@@ -216,8 +216,8 @@ const ProductForm = ({ product, onSubmit, onCancel, hideHeader = false }) => {
       newErrors.price = 'Selling price must be greater than 0';
     }
     
-    if (formData.quantity < 0) {
-      newErrors.quantity = 'Quantity cannot be negative';
+    if (formData.quantity <= 0) {
+      newErrors.quantity = 'Quantity must be greater than 0';
     }
     
     if (formData.reorderLevel < 0) {
@@ -237,7 +237,29 @@ const ProductForm = ({ product, onSubmit, onCancel, hideHeader = false }) => {
     
     setLoading(true);
     try {
-      await onSubmit(formData);
+      // Transform the form data to match backend expectations
+      const backendData = {
+        name: formData.name.trim(),
+        sku: formData.sku.trim(),
+        category: formData.category.primary.trim(),
+        quantity: parseInt(formData.quantity) || 0,
+        pricePerUnit: parseFloat(formData.pricing.sellingPrice) || 0,
+        description: formData.description.trim(),
+        unit: formData.unit,
+        // Optional nested fields that the backend supports
+        origin: {
+          supplier: formData.suppliers.length > 0 ? formData.suppliers[0] : ''
+        },
+        placement: {
+          section: formData.location.warehouse || ''
+        },
+        // Additional data that might be used by the backend
+        specifications: formData.specifications,
+        compliance: formData.compliance,
+        nutrition: formData.nutrition
+      };
+      
+      await onSubmit(backendData);
     } catch (error) {
       setErrors({ submit: error.message });
     } finally {
