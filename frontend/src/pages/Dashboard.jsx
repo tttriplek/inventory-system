@@ -1,7 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { useFacility } from '../contexts/FacilityContext';
 import api from '../services/api';
 
 const Dashboard = () => {
+  const { 
+    currentFacility, 
+    getCurrentFacilityId,
+    hasFeature,
+    hasAnalytics,
+    hasInventory,
+    hasSections,
+    hasExpiry,
+    hasTemperature
+  } = useFacility();
+  
   const [backendStatus, setBackendStatus] = useState('checking');
   const [stats, setStats] = useState({
     totalProducts: 0,
@@ -13,6 +25,13 @@ const Dashboard = () => {
   useEffect(() => {
     checkBackendConnection();
   }, []);
+
+  // Re-fetch stats when facility changes
+  useEffect(() => {
+    if (currentFacility && backendStatus === 'connected') {
+      fetchStats();
+    }
+  }, [currentFacility, backendStatus]);
 
   const checkBackendConnection = async () => {
     try {
@@ -30,12 +49,14 @@ const Dashboard = () => {
   };
 
   const fetchStats = async () => {
+    if (!currentFacility) return;
+    
     try {
-      // Fetch real product data from backend with facility ID - v3
+      // Fetch real product data from backend with current facility ID
       const response = await fetch('http://localhost:5000/api/products', {
         headers: {
           'Content-Type': 'application/json',
-          'X-Facility-ID': '6886896c7ddb5f3a32522a09', // Main warehouse facility ObjectId
+          'X-Facility-ID': getCurrentFacilityId(),
         }
       });
       if (response.ok) {
@@ -47,7 +68,7 @@ const Dashboard = () => {
           totalProducts: products.length,
           lowStock: lowStockProducts.length,
           activeRules: 8, // Placeholder until rules API is ready
-          facilities: 3   // Placeholder until facilities API is ready
+          facilities: 5   // We now have 5 facilities
         });
       } else {
         // Fallback to mock data
@@ -55,7 +76,7 @@ const Dashboard = () => {
           totalProducts: 156,
           lowStock: 23,
           activeRules: 8,
-          facilities: 3
+          facilities: 5
         });
       }
     } catch (error) {
@@ -102,6 +123,71 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Current Facility Info */}
+      {currentFacility && (
+        <div className="mb-6">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow p-6 border border-blue-200">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                  📍 {currentFacility.name}
+                </h2>
+                <div className="flex items-center gap-4 mb-4">
+                  <span className="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-medium">
+                    {currentFacility.code}
+                  </span>
+                  <span className="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded-full">
+                    {currentFacility.type.charAt(0).toUpperCase() + currentFacility.type.slice(1)}
+                  </span>
+                </div>
+                
+                {/* Enabled Features */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">Enabled Features:</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {hasFeature('products') && (
+                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                        📦 Products
+                      </span>
+                    )}
+                    {hasAnalytics() && (
+                      <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                        📊 Analytics
+                      </span>
+                    )}
+                    {hasInventory() && (
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        🏭 Inventory
+                      </span>
+                    )}
+                    {hasSections() && (
+                      <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
+                        🗂️ Sections
+                      </span>
+                    )}
+                    {hasExpiry() && (
+                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                        📅 Expiry Tracking
+                      </span>
+                    )}
+                    {hasTemperature() && (
+                      <span className="text-xs bg-cyan-100 text-cyan-800 px-2 py-1 rounded">
+                        🌡️ Temperature Monitor
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="text-right">
+                <div className="text-sm text-gray-500">Switch facilities using</div>
+                <div className="text-sm text-gray-500">the sidebar selector ⬅️</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

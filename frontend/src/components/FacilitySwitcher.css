@@ -1,0 +1,265 @@
+.facility-switcher {
+  position: relative;
+  z-index: 1000;
+}
+
+.facility-switcher.loading,
+.facility-switcher.error {
+  margin-bottom: 0;
+}
+
+/* Current Facility Display */
+.current-facility {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.current-facility:hover {
+  background: #f9fafb;
+  border-color: #3b82f6;
+}
+
+.current-facility.error {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #991b1b;
+  cursor: default;
+}
+
+.facility-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.facility-icon {
+  font-size: 24px;
+  width: 32px;
+  text-align: center;
+}
+
+.facility-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.facility-name {
+  font-weight: 600;
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.facility-code {
+  font-size: 12px;
+  color: #6b7280;
+  font-family: 'Courier New', monospace;
+  line-height: 1.2;
+}
+
+.dropdown-arrow {
+  font-size: 12px;
+  color: #6b7280;
+  transition: transform 0.2s ease;
+}
+
+.dropdown-arrow.up {
+  transform: rotate(0deg);
+}
+
+.dropdown-arrow.down {
+  transform: rotate(0deg);
+}
+
+/* Loading and Error States */
+.loading-spinner {
+  font-size: 16px;
+  margin-right: 8px;
+}
+
+.error-icon {
+  font-size: 16px;
+  margin-right: 8px;
+}
+
+/* Dropdown */
+.facility-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.facility-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Facility Options */
+.facility-option {
+  padding: 12px;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  position: relative;
+}
+
+.facility-option:last-child {
+  border-bottom: none;
+}
+
+.facility-option:hover {
+  background: #f9fafb;
+}
+
+.facility-option.active {
+  background: #eff6ff;
+  border-left: 4px solid #3b82f6;
+}
+
+.facility-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.facility-option .facility-info {
+  flex: 1;
+}
+
+.facility-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.facility-type {
+  background: #6c757d;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.facility-type.retail {
+  background: #28a745;
+}
+
+.facility-type.warehouse {
+  background: #17a2b8;
+}
+
+.facility-type.distribution {
+  background: #ffc107;
+  color: #212529;
+}
+
+.current-indicator {
+  color: #3b82f6;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+/* Features */
+.facility-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.feature-tag {
+  background: #e9ecef;
+  color: #495057;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.feature-tag.analytics {
+  background: #d4edda;
+  color: #155724;
+}
+
+.feature-tag.inventory {
+  background: #cce5ff;
+  color: #004085;
+}
+
+.feature-tag.sections {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.feature-tag.expiry {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.feature-tag.temperature {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+/* Location */
+.facility-location {
+  font-size: 11px;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .facility-switcher {
+    font-size: 12px;
+  }
+  
+  .facility-icon {
+    font-size: 20px;
+    width: 28px;
+  }
+  
+  .facility-name {
+    font-size: 13px;
+  }
+  
+  .facility-code {
+    font-size: 11px;
+  }
+}
+
+/* Animation */
+.facility-dropdown {
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
