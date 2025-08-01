@@ -1,0 +1,50 @@
+[
+  {
+    "name": "Tech Valley Manufacturing",
+    "type": "manufacturing",
+    "code": "MFG-TV01",
+    "location": {
+      "address": "5678 Industrial Blvd",
+      "city": "Austin",
+      "state": "TX",
+      "zipCode": "78701",
+      "country": "USA"
+    }
+  },
+  {
+    "name": "Downtown Flagship Store",
+    "type": "retail",
+    "code": "RTL-SF01", 
+    "location": {
+      "address": "123 Market Street",
+      "city": "San Francisco",
+      "state": "CA",
+      "zipCode": "94102",
+      "country": "USA"
+    }
+  },
+  {
+    "name": "East Coast Mega Warehouse",
+    "type": "warehouse",
+    "code": "WH-EC01",
+    "location": {
+      "address": "9999 Storage Lane",
+      "city": "Newark",
+      "state": "NJ", 
+      "zipCode": "07102",
+      "country": "USA"
+    }
+  },
+  {
+    "name": "Multi-Purpose Hybrid Center",
+    "type": "hybrid",
+    "code": "HYB-CH01",
+    "location": {
+      "address": "4567 Commerce Way",
+      "city": "Chicago",
+      "state": "IL",
+      "zipCode": "60601",
+      "country": "USA"
+    }
+  }
+]

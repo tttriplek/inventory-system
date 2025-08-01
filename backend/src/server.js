@@ -1,5 +1,5 @@
 require('dotenv').config();
-
+// Feature toggles enabled
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -97,7 +97,7 @@ app.use('/api/facilities', require('./core/facility/facilityRoutes'));
 // 🚀 DYNAMIC MODULE LOADING
 // This will automatically register routes for enabled features
 const moduleLoader = require('./utils/moduleLoader');
-moduleLoader.loadModules(app);
+moduleLoader.loadModules(app); // Reloading modules
 
 // 🔍 API Documentation endpoint
 app.get('/api', (req, res) => {

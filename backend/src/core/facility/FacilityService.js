@@ -104,6 +104,96 @@ class FacilityService {
   }
 
   /**
+   * Check if a specific feature is enabled by facility key (new approach)
+   */
+  static async isFeatureEnabledByKey(facilityKey, featurePath) {
+    try {
+      // For standard facility types, find any facility with that key
+      // For custom facilities, find the specific facility
+      const facility = await Facility.findOne({ facilityKey });
+      return facility ? facility.isFeatureEnabled(featurePath) : false;
+    } catch (error) {
+      logger.error('Failed to check feature status by key:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get facility by key (could be standard type or custom)
+   */
+  static async getFacilityByKey(facilityKey) {
+    try {
+      return await Facility.findOne({ facilityKey });
+    } catch (error) {
+      logger.error('Failed to find facility by key:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create shared feature configuration for standard facility types
+   */
+  static async createOrUpdateStandardFacilityFeatures(facilityType, features) {
+    try {
+      const facilityKey = `facility_${facilityType}`;
+      
+      // Find or create a representative facility for this type
+      let facility = await Facility.findOne({ facilityKey });
+      
+      if (!facility) {
+        // Create a template facility for this type
+        facility = new Facility({
+          name: `${facilityType.charAt(0).toUpperCase() + facilityType.slice(1)} Template`,
+          code: `${facilityType.toUpperCase()}TMPL`,
+          type: facilityType,
+          facilityKey,
+          isCustomFacility: false,
+          features: { ...this.getDefaultFeaturesByType(facilityType), ...features },
+          location: {
+            address: 'Template Location',
+            city: 'Template City',
+            country: 'Template Country'
+          }
+        });
+        
+        await facility.save();
+        logger.info(`Created standard facility template: ${facilityType}`);
+      } else {
+        // Update existing template
+        facility.features = this.deepMerge(facility.features, features);
+        await facility.save();
+        logger.info(`Updated standard facility template: ${facilityType}`);
+      }
+      
+      return facility;
+    } catch (error) {
+      logger.error('Failed to create/update standard facility features:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if a specific feature is enabled for a facility (flat key)
+   */
+  static async isFeatureEnabledFlat(facilityId, featureKey) {
+    try {
+      const facility = await Facility.findById(facilityId);
+      if (!facility) {
+        console.log(`[DEBUG] Facility not found: ${facilityId}`);
+        return false;
+      }
+      
+      console.log(`[DEBUG] Checking feature '${featureKey}' in facility features:`, facility.features);
+      const result = facility.features[featureKey] === true;
+      console.log(`[DEBUG] Feature check result: ${result}`);
+      return result;
+    } catch (error) {
+      logger.error('Failed to check flat feature status:', error);
+      return false;
+    }
+  }
+
+  /**
    * Get all facilities with a specific feature enabled
    */
   static async getFacilitiesWithFeature(featurePath) {
@@ -185,24 +275,76 @@ class FacilityService {
   static getDefaultFeaturesByType(type) {
     const defaults = {
       warehouse: {
-        productManagement: { enabled: true, batchTracking: true, skuGeneration: true },
-        inventory: { enabled: true, realTimeTracking: true, lowStockAlerts: true },
-        sectionManagement: { enabled: true, maxSections: 100 },
-        distribution: { enabled: true, fifoEnforcement: true },
-        analytics: { enabled: true, realTimeMetrics: true }
+        // Core warehouse features
+        productManagement: { enabled: true, batchTracking: true, skuGeneration: true, categoryManagement: true },
+        inventory: { enabled: true, realTimeTracking: true, lowStockAlerts: false, stockThreshold: 100 }, // Warehouses don't need low stock alerts
+        sectionManagement: { enabled: true, maxSections: 200 },
+        distribution: { enabled: true, fifoEnforcement: true, trackDestinations: true },
+        analytics: { enabled: true, realTimeMetrics: true, historicalReports: true },
+        storageDesigner: { enabled: true, layoutDesign: true, utilizationTracking: true },
+        // Warehouse-specific features
+        temperatureMonitoring: { enabled: true, alertSystem: true },
+        expiryTracking: { enabled: false }, // Warehouses typically don't need expiry tracking
+        qualityControl: { enabled: true, inspectionRequired: true },
+        advanced: { barcodeScanning: true, rfidTracking: true }
       },
+      
       retail: {
-        productManagement: { enabled: true, categoryManagement: true },
-        inventory: { enabled: true, lowStockAlerts: true, stockThreshold: 5 },
-        expiryTracking: { enabled: true, alertDays: 7 },
-        analytics: { enabled: true, customDashboards: true }
+        // Core retail features
+        productManagement: { enabled: true, categoryManagement: true, skuGeneration: true },
+        inventory: { enabled: true, lowStockAlerts: true, stockThreshold: 5, automaticReordering: true }, // Critical for retail
+        expiryTracking: { enabled: true, alertDays: 7, autoRemoval: false }, // Essential for retail
+        analytics: { enabled: true, customDashboards: true, predictiveAnalytics: true },
+        sectionManagement: { enabled: true, maxSections: 50 },
+        storageDesigner: { enabled: true, layoutDesign: true },
+        // Retail doesn't need heavy distribution features
+        distribution: { enabled: false },
+        temperatureMonitoring: { enabled: false }, // Usually not needed in retail
+        qualityControl: { enabled: false },
+        advanced: { barcodeScanning: true }
       },
+      
       distribution: {
+        // Core distribution features  
         productManagement: { enabled: true, batchTracking: true },
-        inventory: { enabled: true, realTimeTracking: true },
+        inventory: { enabled: true, realTimeTracking: true, lowStockAlerts: false }, // Distribution doesn't hold stock long
+        distribution: { enabled: true, fifoEnforcement: true, trackDestinations: true, requireApproval: true },
+        temperatureMonitoring: { enabled: true, alertSystem: true }, // Important for cold chain
+        analytics: { enabled: true, predictiveAnalytics: true, realTimeMetrics: true },
+        sectionManagement: { enabled: true, maxSections: 100 },
+        storageDesigner: { enabled: true, spaceOptimization: true },
+        // Distribution centers don't need retail features
+        expiryTracking: { enabled: false }, // Items move too quickly
+        qualityControl: { enabled: true, inspectionRequired: true },
+        advanced: { rfidTracking: true, iotIntegration: true }
+      },
+      
+      manufacturing: {
+        // Core manufacturing features
+        productManagement: { enabled: true, batchTracking: true, skuGeneration: true },
+        inventory: { enabled: true, realTimeTracking: true, lowStockAlerts: true, stockThreshold: 20 }, // Raw materials
+        qualityControl: { enabled: true, inspectionRequired: true, qualityScoring: true, defectTracking: true },
+        temperatureMonitoring: { enabled: true, criticalThresholds: { min: -10, max: 35 } },
+        analytics: { enabled: true, realTimeMetrics: true, historicalReports: true },
+        sectionManagement: { enabled: true, maxSections: 150 },
+        storageDesigner: { enabled: true, layoutDesign: true },
+        expiryTracking: { enabled: true, alertDays: 14 }, // Raw materials can expire
+        distribution: { enabled: true, fifoEnforcement: true },
+        advanced: { iotIntegration: true, aiPredictions: true }
+      },
+      
+      hybrid: {
+        // Combination of warehouse + retail features
+        productManagement: { enabled: true, batchTracking: true, skuGeneration: true, categoryManagement: true },
+        inventory: { enabled: true, realTimeTracking: true, lowStockAlerts: true, stockThreshold: 10 },
+        expiryTracking: { enabled: true, alertDays: 14 },
         distribution: { enabled: true, fifoEnforcement: true, trackDestinations: true },
         temperatureMonitoring: { enabled: true },
-        analytics: { enabled: true, predictiveAnalytics: true }
+        analytics: { enabled: true, realTimeMetrics: true, customDashboards: true },
+        sectionManagement: { enabled: true, maxSections: 100 },
+        storageDesigner: { enabled: true, layoutDesign: true, utilizationTracking: true },
+        qualityControl: { enabled: true },
+        advanced: { barcodeScanning: true, rfidTracking: true }
       }
     };
 

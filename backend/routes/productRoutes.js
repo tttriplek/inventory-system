@@ -214,11 +214,16 @@ router.get('/:id', extractFacilityId, async (req, res) => {
 
 /**
  * POST /api/products
- * Create a new product
+ * Create individual products for each unit (batch creation)
  */
 router.post('/',
   extractFacilityId,
-  validateProduct,
+  [
+    body('name').notEmpty().trim().withMessage('Product name is required'),
+    body('quantity').isInt({ min: 1 }).withMessage('Quantity must be greater than 0'),
+    body('category.primary').notEmpty().withMessage('Primary category is required'),
+    body('pricing.sellingPrice').isFloat({ min: 0 }).withMessage('Selling price must be a positive number'),
+  ],
   async (req, res) => {
     try {
       const errors = validationResult(req);
@@ -230,48 +235,156 @@ router.post('/',
         });
       }
 
-      // Check if SKU already exists in this facility
-      const existingProduct = await Product.findOne({
-        sku: req.body.sku,
-        facilityId: req.facilityId
-      });
+      const { name, category, quantity, pricing, description } = req.body;
+      
+      console.log('Creating individual products:', { name, quantity, category, pricing });
+      
+      // Generate batch ID from product name
+      const prefix = name.slice(0, 2).toUpperCase();
+      const timestamp = Date.now();
+      const batchNumber = String(timestamp).slice(-3);
+      const batchId = `${prefix}-${batchNumber}`;
+      
+      const quantityNum = Number(quantity);
+      const createdProducts = [];
+      
+      console.log(`Creating ${quantityNum} individual products with batchId: ${batchId}`);
+      
+      // Create individual product records - one for each unit
+      for (let i = 1; i <= quantityNum; i++) {
+        const sku = `${batchId}-${String(i).padStart(3, '0')}`; // Unique SKU for each unit
+        
+        const productData = {
+          name,
+          sku,
+          description: description || '',
+          facilityId: req.facilityId,
+          category: {
+            primary: category?.primary || 'General',
+            secondary: category?.secondary || '',
+            tags: category?.tags || []
+          },
+          pricing: {
+            cost: pricing?.cost || 0,
+            sellingPrice: pricing?.sellingPrice || 0,
+            currency: pricing?.currency || 'USD'
+          },
+          // Each individual product has quantity 1
+          totalQuantity: 1,
+          availableQuantity: 1,
+          reservedQuantity: 0,
+          // Add batchId for grouping
+          batchId,
+          // Status
+          status: 'active',
+          createdBy: req.user?.username || 'system',
+          updatedBy: req.user?.username || 'system'
+        };
 
-      if (existingProduct) {
-        return res.status(400).json({
-          success: false,
-          message: 'A product with this SKU already exists in this facility'
-        });
+        console.log(`Creating product ${i}/${quantityNum} with SKU: ${sku}`);
+        const createdProduct = await Product.create(productData);
+        createdProducts.push(createdProduct);
       }
 
-      // Create product with facility ID
-      const productData = {
-        ...req.body,
-        facilityId: req.facilityId,
-        createdBy: req.user?.id || 'system'
-      };
-
-      const product = new Product(productData);
-      await product.save();
+      console.log(`✅ SUCCESS: Created ${quantityNum} individual products in batch ${batchId}`);
 
       res.status(201).json({
         success: true,
-        message: 'Product created successfully',
-        data: product
+        message: `Created ${quantityNum} individual products in batch ${batchId}`,
+        batchId,
+        totalUnits: quantityNum,
+        representative: createdProducts[0]
       });
 
     } catch (error) {
-      console.error('Error creating product:', error);
+      console.error('Error creating products:', error);
       
       if (error.code === 11000) {
         return res.status(400).json({
           success: false,
-          message: 'Product with this SKU already exists'
+          message: 'Product SKU already exists',
+          field: 'sku'
         });
       }
 
       res.status(500).json({
         success: false,
-        message: 'Failed to create product',
+        message: 'Failed to create products',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * PUT /api/products/batch/:batchId
+ * Update all products in a batch
+ */
+router.put('/batch/:batchId',
+  extractFacilityId,
+  [
+    body('name').optional().trim().notEmpty().withMessage('Product name is required'),
+    body('category.primary').optional().notEmpty().withMessage('Primary category is required'),
+    body('pricing.sellingPrice').optional().isFloat({ min: 0 }).withMessage('Selling price must be a positive number'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation errors',
+          errors: errors.array()
+        });
+      }
+
+      const { batchId } = req.params;
+      
+      // Find all products in the batch
+      const batchProducts = await Product.find({
+        batchId,
+        facilityId: req.facilityId
+      });
+
+      if (batchProducts.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No products found for this batch'
+        });
+      }
+
+      console.log(`Updating ${batchProducts.length} products in batch ${batchId}`);
+
+      // Update all products in the batch
+      const updateData = {
+        ...req.body,
+        updatedBy: req.user?.username || 'system',
+        updatedAt: new Date()
+      };
+
+      // Remove fields that should not be updated for individual products
+      delete updateData.quantity; // Don't change individual quantities
+      delete updateData.sku; // Don't change individual SKUs
+      
+      const result = await Product.updateMany(
+        { batchId, facilityId: req.facilityId },
+        { $set: updateData }
+      );
+
+      console.log(`Successfully updated ${result.modifiedCount} products in batch ${batchId}`);
+
+      res.json({
+        success: true,
+        message: `Updated ${result.modifiedCount} products in batch ${batchId}`,
+        modifiedCount: result.modifiedCount,
+        batchId
+      });
+
+    } catch (error) {
+      console.error('Error updating batch:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to update batch',
         error: error.message
       });
     }

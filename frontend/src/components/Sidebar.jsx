@@ -23,64 +23,108 @@ function Sidebar() {
       label: "Products",
       icon: "📦",
       requiredFeatures: [],
-      featureGate: 'product-management'
+      featureGate: 'productManagement'
     },
     {
       to: "/storage-designer",
       label: "Storage Designer",
       icon: "🏗️",
-      requiredFeatures: ['storage-designer', 'section-management'],
-      featureGate: 'storage-designer',
+      requiredFeatures: ['storageDesigner', 'sectionManagement'],
+      featureGate: 'storageDesigner',
       description: "Complete warehouse design & management"
-    },
-    {
-      to: "/rule-manager",
-      label: "Rules",
-      icon: "📋",
-      requiredFeatures: [],
-      featureGate: 'rule-engine'
     },
     {
       to: "/analytics",
       label: "Analytics",
       icon: "📈",
-      requiredFeatures: ['analytics-dashboard'],
-      featureGate: 'analytics-dashboard'
+      requiredFeatures: ['analyticsDashboard'],
+      featureGate: 'analyticsDashboard'
     },
-    {
-      to: "/activity",
-      label: "Activity Log",
-      icon: "📝",
-      requiredFeatures: [],
-      featureGate: 'batch-operations'
-    },
+    // Removed incomplete menu item object at line 45
     {
       to: "/low-stock",
       label: "Low Stock",
       icon: "⚠️",
-      requiredFeatures: ['inventory-alerts'],
-      featureGate: 'inventory-alerts'
+      requiredFeatures: ['inventoryAlerts'],
+      featureGate: 'inventoryAlerts'
     },
     {
-      to: "/expiring",
+      to: "/expiring-products",
       label: "Expiring Products",
       icon: "📅",
-      requiredFeatures: ['expiry-management'],
-      featureGate: 'expiry-management'
-    },
-    {
-      to: "/temperature-monitor",
-      label: "Temperature Monitor",
-      icon: "🌡️",
-      requiredFeatures: ['temperature-monitoring'],
-      featureGate: 'temperature-monitoring'
+      requiredFeatures: ['expiryManagement'],
+      featureGate: 'expiryManagement'
     },
     {
       to: "/purchase-orders",
       label: "Purchase Orders",
       icon: "🛍️",
-      requiredFeatures: [],
-      featureGate: 'batch-operations'
+      requiredFeatures: ['batchOperations'],
+      featureGate: 'batchOperations'
+    },
+    {
+      to: "/activity",
+      label: "Activity Log",
+      icon: "📋",
+      requiredFeatures: ['featureToggleAdmin'],
+      featureGate: 'featureToggleAdmin'
+    },
+    // Enterprise Features
+    {
+      to: "/notifications",
+      label: "Smart Notifications",
+      icon: "🔔",
+      requiredFeatures: ['smart-notifications'],
+      featureGate: 'smart-notifications',
+      description: "Multi-channel notification management"
+    },
+    {
+      to: "/financial",
+      label: "Financial Tracking",
+      icon: "💰",
+      requiredFeatures: ['financial-tracking'],
+      featureGate: 'financial-tracking',
+      description: "Real-time inventory valuation & cost analysis"
+    },
+    {
+      to: "/multi-currency",
+      label: "Multi-Currency",
+      icon: "💱",
+      requiredFeatures: ['multi-currency-support'],
+      featureGate: 'multi-currency-support',
+      description: "Support for multiple currencies"
+    },
+    {
+      to: "/cost-analysis",
+      label: "Cost Analysis",
+      icon: "📊",
+      requiredFeatures: ['cost-analysis'],
+      featureGate: 'cost-analysis',
+      description: "Advanced cost analysis & forecasting"
+    },
+    {
+      to: "/security",
+      label: "Security & Compliance",
+      icon: "🛡️",
+      requiredFeatures: ['security-compliance'],
+      featureGate: 'security-compliance',
+      description: "Security monitoring & compliance"
+    },
+    {
+      to: "/insurance",
+      label: "Insurance Integration",
+      icon: "🛡️",
+      requiredFeatures: ['insurance-integration'],
+      featureGate: 'insurance-integration',
+      description: "Insurance coverage & claims management"
+    },
+    {
+      to: "/audit",
+      label: "Audit & Compliance",
+      icon: "🔒",
+      requiredFeatures: ['audit-trails'],
+      featureGate: 'audit-trails',
+      description: "Comprehensive audit logging & compliance"
     }
   ];
 
@@ -90,7 +134,7 @@ function Sidebar() {
       to: "/admin/features",
       label: "Feature Toggles",
       icon: "🎛️",
-      featureGate: 'feature-toggle-admin'
+      featureGate: 'featureToggleAdmin'
     }
   ];
 

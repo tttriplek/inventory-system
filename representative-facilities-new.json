@@ -1,0 +1,67 @@
+[
+  {
+    "name": "Premium Retail Store",
+    "code": "RETAIL001",
+    "type": "retail",
+    "description": "High-end retail store focusing on electronics and consumer goods",
+    "location": {
+      "address": "123 Shopping Blvd",
+      "city": "New York",
+      "state": "NY",
+      "zipCode": "10001",
+      "country": "USA"
+    }
+  },
+  {
+    "name": "Central Warehouse",
+    "code": "WAREHOUSE001", 
+    "type": "warehouse",
+    "description": "Main storage facility for regional distribution",
+    "location": {
+      "address": "456 Storage Ave",
+      "city": "Chicago",
+      "state": "IL",
+      "zipCode": "60601",
+      "country": "USA"
+    }
+  },
+  {
+    "name": "Regional Distribution Center",
+    "code": "DIST001",
+    "type": "distribution",
+    "description": "Hub for coordinating shipments across the region", 
+    "location": {
+      "address": "789 Logistics Dr",
+      "city": "Atlanta",
+      "state": "GA",
+      "zipCode": "30301",
+      "country": "USA"
+    }
+  },
+  {
+    "name": "Advanced Manufacturing Plant",
+    "code": "MFG001",
+    "type": "manufacturing",
+    "description": "High-tech manufacturing facility with automated production lines",
+    "location": {
+      "address": "321 Industrial Way", 
+      "city": "Detroit",
+      "state": "MI",
+      "zipCode": "48201",
+      "country": "USA"
+    }
+  },
+  {
+    "name": "Multi-Purpose Hybrid Center",
+    "code": "HYBRID001",
+    "type": "hybrid",
+    "description": "Combined retail, storage, and light manufacturing facility",
+    "location": {
+      "address": "654 Commerce St",
+      "city": "Austin", 
+      "state": "TX",
+      "zipCode": "78701",
+      "country": "USA"
+    }
+  }
+]

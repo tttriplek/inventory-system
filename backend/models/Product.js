@@ -197,6 +197,11 @@ const productSchema = new mongoose.Schema({
     uppercase: true,
     index: true
   },
+  batchId: {
+    type: String,
+    index: true,
+    trim: true
+  },
   upc: {
     type: String,
     index: true
@@ -395,6 +400,39 @@ const productSchema = new mongoose.Schema({
     }]
   },
   
+  // Storage Location (for Storage Designer)
+  storageLocation: {
+    warehouse: {
+      type: String,
+      index: true
+    },
+    zone: {
+      type: String,
+      index: true
+    },
+    aisle: {
+      type: String,
+      index: true
+    },
+    shelf: {
+      type: String,
+      index: true
+    },
+    bin: {
+      type: String,
+      index: true
+    },
+    coordinates: {
+      x: Number,
+      y: Number,
+      z: Number
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now
+    }
+  },
+  
   // Status and Lifecycle
   status: {
     type: String,
@@ -450,6 +488,11 @@ productSchema.index({ facilityId: 1, totalQuantity: 1 });
 productSchema.index({ facilityId: 1, 'batches.expiryDate': 1 });
 productSchema.index({ facilityId: 1, reorderLevel: 1, totalQuantity: 1 });
 productSchema.index({ sku: 1, facilityId: 1 });
+// Storage location indexes
+productSchema.index({ facilityId: 1, 'storageLocation.warehouse': 1 });
+productSchema.index({ facilityId: 1, 'storageLocation.zone': 1 });
+productSchema.index({ facilityId: 1, 'storageLocation.aisle': 1 });
+productSchema.index({ 'storageLocation.warehouse': 1, 'storageLocation.zone': 1, 'storageLocation.aisle': 1 });
 productSchema.index({ name: 'text', description: 'text', sku: 'text' });
 
 // Virtual fields
@@ -511,17 +554,26 @@ productSchema.methods.updateBatch = function(batchNumber, updateData) {
 };
 
 productSchema.methods.recalculateQuantities = function() {
-  const available = this.batches
-    .filter(b => b.status === 'available')
-    .reduce((sum, b) => sum + b.quantity, 0);
-    
-  const reserved = this.batches
-    .filter(b => b.status === 'reserved')
-    .reduce((sum, b) => sum + b.quantity, 0);
-    
-  this.availableQuantity = available;
-  this.reservedQuantity = reserved;
-  this.totalQuantity = available + reserved;
+  // If this product has batches, calculate from batches
+  if (this.batches && this.batches.length > 0) {
+    const available = this.batches
+      .filter(b => b.status === 'available')
+      .reduce((sum, b) => sum + b.quantity, 0);
+      
+    const reserved = this.batches
+      .filter(b => b.status === 'reserved')
+      .reduce((sum, b) => sum + b.quantity, 0);
+      
+    this.availableQuantity = available;
+    this.reservedQuantity = reserved;
+    this.totalQuantity = available + reserved;
+  } else {
+    // For individual products (without batches), preserve the set quantities
+    // Only recalculate if totalQuantity is not already set
+    if (this.totalQuantity === undefined || this.totalQuantity === null) {
+      this.totalQuantity = this.availableQuantity || 0;
+    }
+  }
 };
 
 productSchema.methods.generateBatchNumber = function() {

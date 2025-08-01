@@ -29,10 +29,10 @@ export const FeatureProvider = ({ children, facilityId = null }) => {
       setLoading(true);
       setError(null);
 
-      // Fetch feature definitions
+      // Fetch feature definitions first
       const definitionsResponse = await fetch('http://localhost:5000/api/features/definitions');
       if (!definitionsResponse.ok) {
-        throw new Error(`HTTP error! status: ${definitionsResponse.status}`);
+        throw new Error(`Failed to fetch definitions: ${definitionsResponse.status}`);
       }
       const definitionsData = await definitionsResponse.json();
       
@@ -42,97 +42,99 @@ export const FeatureProvider = ({ children, facilityId = null }) => {
         : '/api/features/global/toggles';
 
       const response = await fetch(`http://localhost:5000${endpoint}`);
-      
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`Failed to fetch toggles: ${response.status}`);
       }
       
       const data = await response.json();
       
+      // If facility-specific, also fetch enterprise features
+      let enterpriseFeatures = {};
+      if (facilityId) {
+        try {
+          const enterpriseResponse = await fetch(
+            `http://localhost:5000/api/features/facility/${facilityId}/enterprise`,
+            {
+              headers: {
+                'X-Facility-Code': facilityId
+              }
+            }
+          );
+          if (enterpriseResponse.ok) {
+            const enterpriseData = await enterpriseResponse.json();
+            enterpriseFeatures = enterpriseData.enterpriseFeatures || {};
+          }
+        } catch (enterpriseError) {
+          console.warn('Failed to fetch enterprise features:', enterpriseError);
+        }
+      }
+      
       if (data.success && definitionsData.success) {
-        // Create definitions lookup
+        // Create definitions lookup by kebab-case ID
         const definitionsLookup = {};
         definitionsData.features.forEach(feature => {
           definitionsLookup[feature.id] = feature;
         });
         setDefinitions(definitionsLookup);
         
-        // Create toggles with definitions and metadata
+        // Extract config data
+        const configData = data.config || {};
+        
+        // Merge regular features with enterprise features
+        const allFeatures = { ...configData, ...enterpriseFeatures };
+        
+        // Create simple features object (kebab-case keys, boolean values)
+        setFeatures(allFeatures);
+        
+        // Create toggles object with definitions for admin UI
         const togglesWithDefinitions = {};
-        Object.keys(data.config).forEach(featureId => {
+        Object.keys(allFeatures).forEach(featureId => {
           const definition = definitionsLookup[featureId] || {
             id: featureId,
-            name: featureId,
-            description: 'No description available',
+            name: featureId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            description: 'Feature description not available',
             category: 'core',
-            dependencies: [],
-            components: [],
-            icon: '⚙️' // Default icon
+            dependencies: []
           };
+          
+          // Check if this is a core feature that can't be disabled in facility mode
+          const isCoreFeature = facilityId && ['product-management', 'storage-designer'].includes(featureId);
           
           togglesWithDefinitions[featureId] = {
-            enabled: data.config[featureId],
+            enabled: configData[featureId],
             definition: definition,
-            dependents: [], // Calculate dependents
-            missingDependencies: [], // Calculate missing dependencies
-            canToggle: true // Default to true, can be updated based on dependencies
+            canToggle: !isCoreFeature // Core features can't be toggled off in facility mode
           };
-        });
-        
-        // Calculate dependents for each feature
-        Object.keys(togglesWithDefinitions).forEach(featureId => {
-          const toggle = togglesWithDefinitions[featureId];
-          const definition = toggle.definition;
-          
-          // Find features that depend on this one
-          toggle.dependents = Object.keys(togglesWithDefinitions).filter(otherId => {
-            const otherDefinition = togglesWithDefinitions[otherId].definition;
-            return otherDefinition.dependencies && otherDefinition.dependencies.includes(featureId);
-          });
-          
-          // Calculate missing dependencies
-          if (definition.dependencies) {
-            toggle.missingDependencies = definition.dependencies.filter(depId => {
-              const depToggle = togglesWithDefinitions[depId];
-              return !depToggle || !depToggle.enabled;
-            });
-          }
-          
-          // Can't toggle off if other features depend on it
-          toggle.canToggle = toggle.dependents.length === 0 || !toggle.enabled;
         });
         
         setToggles(togglesWithDefinitions);
-        
-        // Convert config to simple enabled/disabled map
-        const featureMap = {};
-        Object.keys(data.config).forEach(featureId => {
-          featureMap[featureId] = data.config[featureId];
-        });
-        setFeatures(featureMap);
       } else {
-        throw new Error(data.error || 'Failed to fetch features');
+        throw new Error('Failed to fetch features data');
       }
     } catch (err) {
       console.error('Error fetching features:', err);
       setError(err.message);
       
-      // Fallback to all features enabled for development
-      console.warn('Using fallback feature configuration - all enabled');
+      // Simple fallback configuration
       const fallbackFeatures = {
-        productManagement: true,
-        batchManagement: true,
-        storageDesigner: true,
-        sectionManagement: true,
-        analytics: true,
-        temperatureMonitoring: false,
-        qualityControl: false,
-        distributionManagement: true,
-        inventoryTracking: true,
-        purchaseOrders: true,
-        activityLogging: true
+        'product-management': true,
+        'storage-designer': true,
+        'analytics-dashboard': true,
+        'temperature-monitoring': false,
+        'quality-control': false,
+        'purchase-orders': true,
+        'activity-log': true,
+        // Enterprise features fallback
+        'smart-notifications': false,
+        'financial-tracking': false,
+        'multi-currency-support': false,
+        'cost-analysis': false,
+        'security-compliance': false,
+        'insurance-integration': false,
+        'audit-trails': false
       };
       setFeatures(fallbackFeatures);
+      setToggles({});
     } finally {
       setLoading(false);
     }
@@ -140,23 +142,23 @@ export const FeatureProvider = ({ children, facilityId = null }) => {
 
   // Check if a feature is enabled
   const isFeatureEnabled = (featureId) => {
-    return Boolean(features[featureId]);
+    // Support both kebab-case and camelCase lookups
+    if (features[featureId] !== undefined) {
+      return Boolean(features[featureId]);
+    }
+    
+    // Try converting camelCase to kebab-case
+    const kebabCase = featureId.replace(/([A-Z])/g, '-$1').toLowerCase();
+    if (features[kebabCase] !== undefined) {
+      return Boolean(features[kebabCase]);
+    }
+    
+    return false;
   };
 
   // Check if a feature is enabled (with object structure support)
   const hasFeature = (featureId) => {
-    const feature = features[featureId];
-    
-    // Handle both boolean and object structures
-    if (typeof feature === 'boolean') {
-      return feature;
-    }
-    
-    if (typeof feature === 'object' && feature !== null) {
-      return Boolean(feature.enabled);
-    }
-    
-    return false;
+    return isFeatureEnabled(featureId);
   };
 
   // Toggle a feature (for admin UI)

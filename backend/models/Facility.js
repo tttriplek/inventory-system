@@ -16,7 +16,7 @@ const facilitySchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['warehouse', 'retail', 'distribution', 'manufacturing', 'cold-storage'],
+    enum: ['warehouse', 'retail', 'distribution', 'manufacturing', 'cold-storage', 'financial-hub'],
     lowercase: true
   },
   description: {

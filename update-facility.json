@@ -1,0 +1,12 @@
+{
+  "name": "West Coast Distribution Hub",
+  "type": "distribution", 
+  "code": "DIST-WC01",
+  "location": {
+    "address": "1234 Logistics Way",
+    "city": "Los Angeles", 
+    "state": "CA",
+    "zipCode": "90210",
+    "country": "USA"
+  }
+}

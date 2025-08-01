@@ -51,11 +51,12 @@ const [showDistForm, setShowDistForm] = useState(false);
     setFiltered(data);
   }, [batch, dateRange, skuSearch, allProducts]);
 
-  const totalQty = filtered.reduce((sum, p) => sum + (p.quantity || 1), 0);
+  const totalQty = filtered.reduce((sum, p) => sum + (p.totalQuantity || p.quantity || 1), 0);
   const totalPrice = filtered.reduce((sum, p) => {
-  const fallbackPrice = (p.pricePerUnit || 0) * (p.quantity || 1);
-  return sum + (p.totalPrice ?? fallbackPrice);
-}, 0);
+    const price = p.pricing?.sellingPrice || p.pricePerUnit || 0;
+    const qty = p.totalQuantity || p.quantity || 1;
+    return sum + (price * qty);
+  }, 0);
   const avgPrice = totalQty > 0 ? (totalPrice / totalQty).toFixed(2) : 0;
 
   const uniqueBatches = [...new Set(allProducts.map((p) => p.batchId))];
@@ -117,6 +118,61 @@ const [showDistForm, setShowDistForm] = useState(false);
     }
   };
 
+  // Edit Product Function
+  const handleEditProduct = (product) => {
+    // Navigate to edit form or open modal
+    // For now, we'll use a simple prompt to update basic fields
+    const newQuantity = prompt('Enter new quantity:', product.totalQuantity || product.quantity || 1);
+    const newPrice = prompt('Enter new price:', product.pricing?.sellingPrice || product.pricePerUnit || 0);
+    
+    if (newQuantity !== null && newPrice !== null) {
+      const updatedProduct = {
+        ...product,
+        quantity: parseInt(newQuantity) || product.quantity,
+        totalQuantity: parseInt(newQuantity) || product.totalQuantity,
+        pricePerUnit: parseFloat(newPrice) || product.pricePerUnit,
+        pricing: {
+          ...product.pricing,
+          sellingPrice: parseFloat(newPrice) || product.pricing?.sellingPrice
+        }
+      };
+
+      // Send update request
+      axios.put(`http://localhost:5000/api/products/${product._id}`, updatedProduct)
+        .then(() => {
+          alert('Product updated successfully');
+          // Refresh data
+          axios.get(`http://localhost:5000/api/products?name=${encodeURIComponent(name)}`)
+            .then((res) => {
+              setAllProducts(res.data);
+              setFiltered(res.data);
+            });
+        })
+        .catch((err) => {
+          alert('Failed to update product: ' + (err.response?.data?.message || err.message));
+        });
+    }
+  };
+
+  // Delete Product Function
+  const handleDeleteProduct = (productId) => {
+    if (window.confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
+      axios.delete(`http://localhost:5000/api/products/${productId}`)
+        .then(() => {
+          alert('Product deleted successfully');
+          // Refresh data
+          axios.get(`http://localhost:5000/api/products?name=${encodeURIComponent(name)}`)
+            .then((res) => {
+              setAllProducts(res.data);
+              setFiltered(res.data);
+            });
+        })
+        .catch((err) => {
+          alert('Failed to delete product: ' + (err.response?.data?.message || err.message));
+        });
+    }
+  };
+
 const batchSummaries = () => {
   const batchMap = {};
 
@@ -125,21 +181,22 @@ const batchSummaries = () => {
     if (!batchMap[batch]) {
       batchMap[batch] = {
         batchId: batch,
-        totalQuantity: 0,       // ✅ From initialQuantity (doesn't change)
-        quantityRemaining: 0,   // ✅ From quantity (can change)
+        totalQuantity: 0,       // Count of individual products in batch
+        quantityRemaining: 0,   // Count of available individual products
         totalPrice: 0,
         avgPrice: 0,
         receivedDate: item.receivedDate
       };
     }
 
-    const qty = item.quantity || 0;
-    const initQty = item.initialQuantity || 0;
-    const price = item.pricePerUnit || 0;
+    // Each individual product represents 1 unit
+    const qty = item.totalQuantity || item.quantity || 1; // Current quantity (should be 1 for individual products)
+    const initQty = item.totalQuantity || item.initialQuantity || 1; // Initial quantity (should be 1)
+    const price = item.pricing?.sellingPrice || item.pricePerUnit || 0;
 
+    // Count individual products to get batch totals
     batchMap[batch].totalQuantity += initQty;
     batchMap[batch].quantityRemaining += qty;
-
     batchMap[batch].totalPrice += price * initQty;
   }
 
@@ -335,6 +392,48 @@ const destinationSummaries = () => {
       <p><strong>Unplaced Quantity:</strong> {
         totalQty - filtered.reduce((sum, p) => sum + (p.placements || []).reduce((s, pl) => s + (pl.quantity || 0), 0), 0)
       }</p>
+
+      {/* Individual Products */}
+      <h3>Individual Products</h3>
+      <table border="1" cellPadding="8" cellSpacing="0" style={{ width: '100%', marginBottom: '20px' }}>
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Batch ID</th>
+            <th>Quantity</th>
+            <th>Price</th>
+            <th>Status</th>
+            <th>Received Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map((product) => (
+            <tr key={product._id}>
+              <td>{product.sku || 'N/A'}</td>
+              <td>{product.batchId}</td>
+              <td>{product.totalQuantity || product.quantity || 1}</td>
+              <td>₵{(product.pricing?.sellingPrice || product.pricePerUnit || 0).toFixed(2)}</td>
+              <td>{product.status || 'active'}</td>
+              <td>{product.receivedDate?.slice(0, 10)}</td>
+              <td>
+                <button 
+                  onClick={() => handleEditProduct(product)}
+                  style={{ marginRight: '8px', padding: '4px 8px', backgroundColor: '#2196F3', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  Edit
+                </button>
+                <button 
+                  onClick={() => handleDeleteProduct(product._id)}
+                  style={{ padding: '4px 8px', backgroundColor: '#f44336', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  Delete
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       {/* Batch Summary */}
       <h3>Batch Summary</h3>

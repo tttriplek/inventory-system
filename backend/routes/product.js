@@ -69,7 +69,7 @@ router.get('/analytics', async (req, res) => {
     // Low stock alerts
     const lowStockProducts = await Product.find({
       facilityId: req.facilityId,
-      quantity: { $lte: 5 }
+      totalQuantity: { $lte: 5 }
     });
 
     // Batch analytics
@@ -78,9 +78,9 @@ router.get('/analytics', async (req, res) => {
       { 
         $group: {
           _id: '$batchId',
-          totalUnits: { $sum: '$quantity' },
-          totalValue: { $sum: '$totalPrice' },
-          products: { $push: { name: '$name', sku: '$sku', quantity: '$quantity' } }
+          totalUnits: { $sum: '$totalQuantity' },
+          totalValue: { $sum: { $multiply: ['$totalQuantity', '$pricing.sellingPrice'] } },
+          products: { $push: { name: '$name', sku: '$sku', quantity: '$totalQuantity' } }
         }
       },
       { $sort: { totalValue: -1 } }
@@ -93,8 +93,8 @@ router.get('/analytics', async (req, res) => {
         $group: {
           _id: '$category',
           totalProducts: { $sum: 1 },
-          totalQuantity: { $sum: '$quantity' },
-          totalValue: { $sum: '$totalPrice' }
+          totalQuantity: { $sum: '$totalQuantity' },
+          totalValue: { $sum: { $multiply: ['$totalQuantity', '$pricing.sellingPrice'] } }
         }
       },
       { $sort: { totalValue: -1 } }
@@ -104,13 +104,14 @@ router.get('/analytics', async (req, res) => {
     const recentProducts = await Product.find({ facilityId: req.facilityId })
       .sort({ createdAt: -1 })
       .limit(5)
-      .select('name sku quantity createdAt');
+      .select('name sku totalQuantity createdAt');
 
     const analytics = {
       summary: {
         totalProducts: await Product.countDocuments({ facilityId: req.facilityId }),
         totalValue: (await Product.aggregate([
           { $match: { facilityId: req.facilityId } },
+          { $project: { totalPrice: { $multiply: ['$totalQuantity', '$pricing.sellingPrice'] } } },
           { $group: { _id: null, total: { $sum: '$totalPrice' } } }
         ]))[0]?.total || 0,
         expiringCount: expiringProducts.length,
@@ -240,11 +241,11 @@ router.post('/distribute', async (req, res) => {
     const availableProducts = await Product.find({
       facilityId: req.facilityId,
       name: productName,
-      quantity: { $gt: 0 },
+      totalQuantity: { $gt: 0 },
       status: 'active'
     }).sort({ receivedDate: 1 }); // FIFO - oldest first
 
-    let totalAvailable = availableProducts.reduce((sum, p) => sum + p.quantity, 0);
+    let totalAvailable = availableProducts.reduce((sum, p) => sum + p.totalQuantity, 0);
     
     if (totalAvailable < requestedQuantity) {
       return res.status(400).json({
@@ -260,10 +261,11 @@ router.post('/distribute', async (req, res) => {
     for (const product of availableProducts) {
       if (remainingToDistribute <= 0) break;
 
-      const quantityToTake = Math.min(product.quantity, remainingToDistribute);
+      const quantityToTake = Math.min(product.totalQuantity, remainingToDistribute);
       
       // Update product quantity
-      product.quantity -= quantityToTake;
+      product.totalQuantity -= quantityToTake;
+      product.availableQuantity = product.totalQuantity; // Keep in sync
       remainingToDistribute -= quantityToTake;
 
       // Add distribution record
@@ -271,7 +273,7 @@ router.post('/distribute', async (req, res) => {
         quantity: quantityToTake,
         date: distributionDate,
         reason: distributionReason,
-        remainingQuantity: product.quantity
+        remainingQuantity: product.totalQuantity
       };
 
       product.distributions.push(distributionRecord);
@@ -290,7 +292,7 @@ router.post('/distribute', async (req, res) => {
         sku: product.sku,
         batchId: product.batchId,
         quantityDistributed: quantityToTake,
-        remainingQuantity: product.quantity,
+        remainingQuantity: product.totalQuantity,
         expiryDate: product.expiry?.date
       });
 
@@ -323,53 +325,102 @@ router.post('/distribute', async (req, res) => {
 // ✅ Create product with batch and SKUs
 router.post('/', async (req, res) => {
   try {
-    const { name, category, quantity, size, pricePerUnit, totalPrice, origin } = req.body;
+    console.log('🔍 DEBUG - Headers:', req.headers);
+    console.log('🔍 DEBUG - Body:', JSON.stringify(req.body, null, 2));
+    
+    const facilityId = req.headers['x-facility-id'];
+    if (!facilityId) {
+      return res.status(400).json({ error: 'Facility ID is required' });
+    }
+
+    const { name, category, quantity, pricing, description } = req.body;
 
     if (!name || !quantity) {
       return res.status(400).json({ error: 'Name and quantity are required' });
     }
-    const prefix = name.slice(0, 2).toUpperCase(); // e.g., MO
-    const lastBatch = await Product.find({ name }).sort({ receivedDate: -1 }).limit(1);
-    let batchNumber = 1;
-
-    if (lastBatch.length > 0 && lastBatch[0].batchId?.startsWith(prefix)) {
-      const last = parseInt(lastBatch[0].batchId.split('-')[1]) || 1;
-      batchNumber = last + 1;
-    }
-
-    const batchId = `${prefix}-${String(batchNumber).padStart(3, '0')}`;
-    const receivedDate = new Date();
-
-    // Create one product document per unit, each with a unique SKU
-    const productsToCreate = [];
-    for (let i = 1; i <= Number(quantity); i++) {
-      const sku = `${batchId}-${String(i).padStart(2, '0')}`;
-      productsToCreate.push({
+    
+    console.log('Creating product:', { name, quantity, category, pricing });
+    
+    const prefix = name.slice(0, 2).toUpperCase(); // e.g., GU
+    const timestamp = Date.now();
+    const batchNumber = String(timestamp).slice(-3); // Use timestamp for unique batch
+    const batchId = `${prefix}-${batchNumber}`;
+    
+    const quantityNum = Number(quantity);
+    const createdProducts = [];
+    
+    console.log(`Creating ${quantityNum} individual products with batchId: ${batchId}`);
+    
+    // Create individual product records - one for each unit
+    for (let i = 1; i <= quantityNum; i++) {
+      const sku = `${batchId}-${String(i).padStart(3, '0')}`; // Unique SKU for each unit
+      
+      const productData = {
         name,
-        category,
-        quantity: 1,
-        initialQuantity: 1,
-        size,
-        pricePerUnit,
-        totalPrice: pricePerUnit, // Each unit gets its own price
         sku,
+        description: description || '',
+        facilityId,
+        category: {
+          primary: category?.primary || 'General',
+          secondary: category?.secondary || '',
+          tags: category?.tags || []
+        },
+        pricing: {
+          cost: pricing?.cost || 0,
+          sellingPrice: pricing?.sellingPrice || pricing?.pricePerUnit || 0,
+          currency: pricing?.currency || 'USD'
+        },
+        // Set quantities - using schema field names
+        totalQuantity: 1, // Each individual product has quantity 1
+        availableQuantity: 1,
+        reservedQuantity: 0,
+        // Add the batchId as an additional field (even if not in strict schema)
         batchId,
-        origin,
-        receivedDate
-      });
+        // Status
+        status: 'active',
+        createdBy: req.user?.username || 'system',
+        updatedBy: req.user?.username || 'system'
+      };
+
+      console.log(`🔧 DEBUG - Creating product ${i}/${quantityNum} with data:`, JSON.stringify(productData, null, 2));
+      
+      const createdProduct = await Product.create(productData);
+      createdProducts.push(createdProduct);
     }
-    const createdProducts = await Product.insertMany(productsToCreate);
-    for (const created of createdProducts) {
-      await logActivity({
-        action: 'create',
-        entity: 'Product',
-        entityId: created._id.toString(),
-        user: req.user?.username || 'system',
-        details: created
-      });
-    }
-    res.status(201).json(createdProducts);
+    
+    // Log activity for the batch creation
+    await logActivity({
+      action: 'create',
+      entity: 'Product',
+      entityId: 'batch-' + batchId,
+      user: req.user?.username || 'system',
+      details: {
+        batchId,
+        totalUnits: quantityNum,
+        name,
+        message: `Created batch of ${quantityNum} units`
+      }
+    });
+
+    console.log(`✅ SUCCESS: Created ${quantityNum} individual products`);
+
+    // Return the first product as representative (frontend will group them)
+    res.status(201).json({
+      success: true,
+      message: `Created ${quantityNum} individual products in batch ${batchId}`,
+      batchId,
+      totalUnits: quantityNum,
+      representative: createdProducts[0]
+    });
   } catch (err) {
+    console.error('❌ Error creating products:', err);
+    console.error('❌ Error details:', err.message);
+    if (err.errors) {
+      console.error('❌ Validation errors:');
+      Object.keys(err.errors).forEach(key => {
+        console.error(`  - ${key}: ${err.errors[key].message}`);
+      });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -381,12 +432,12 @@ router.get('/low-stock', async (req, res) => {
     if (isNaN(threshold) || threshold < 1) {
       return res.status(400).json({ error: 'Invalid threshold value' });
     }
-    // Aggregate by product name and sum quantity
+    // Aggregate by product name and sum totalQuantity
     const agg = await Product.aggregate([
       {
         $group: {
           _id: '$name',
-          totalQuantity: { $sum: '$quantity' },
+          totalQuantity: { $sum: '$totalQuantity' },
           products: { $push: '$$ROOT' }
         }
       },
@@ -446,16 +497,30 @@ router.get('/:id', async (req, res) => {
 // ✅ Update product
 router.put('/:id', async (req, res) => {
   try {
-    const updated = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const productId = req.params.id;
+    
+    // Check if the ID is a valid ObjectId
+    if (!productId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ error: 'Invalid product ID format' });
+    }
+    
+    const updated = await Product.findByIdAndUpdate(productId, req.body, { new: true });
+    
+    if (!updated) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    
     await logActivity({
       action: 'update',
       entity: 'Product',
-      entityId: req.params.id,
+      entityId: productId,
       user: req.user?.username || 'system',
       details: req.body
     });
-    res.json(updated);
+    
+    res.json({ success: true, data: updated });
   } catch (err) {
+    console.error('Product update error:', err);
     res.status(400).json({ error: err.message });
   }
 });
@@ -463,16 +528,30 @@ router.put('/:id', async (req, res) => {
 // ✅ Delete product
 router.delete('/:id', async (req, res) => {
   try {
-    await Product.findByIdAndDelete(req.params.id);
+    const productId = req.params.id;
+    
+    // Check if the ID is a valid ObjectId
+    if (!productId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ error: 'Invalid product ID format' });
+    }
+    
+    const deleted = await Product.findByIdAndDelete(productId);
+    
+    if (!deleted) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    
     await logActivity({
       action: 'delete',
       entity: 'Product',
-      entityId: req.params.id,
+      entityId: productId,
       user: req.user?.username || 'system',
       details: {}
     });
-    res.json({ message: 'Product deleted' });
+    
+    res.json({ success: true, message: 'Product deleted successfully' });
   } catch (err) {
+    console.error('Product delete error:', err);
     res.status(400).json({ error: err.message });
   }
 });
@@ -508,7 +587,7 @@ router.post('/distribute', async (req, res) => {
     for (const product of products) {
       if (qtyRemaining <= 0) break;
 
-      const availableQty = product.quantity || 0;
+      const availableQty = product.totalQuantity || 0;
       const useQty = Math.min(qtyRemaining, availableQty);
 
       if (useQty > 0) {
@@ -517,11 +596,12 @@ router.post('/distribute', async (req, res) => {
         product.distributions.push({
           destination,
           quantity: useQty,
-          priceSent: useQty * (product.pricePerUnit || 0),
+          priceSent: useQty * (product.pricing?.sellingPrice || 0),
           date: new Date()
         });
 
-        product.quantity -= useQty;
+        product.totalQuantity -= useQty;
+        product.availableQuantity = product.totalQuantity; // Keep in sync
 
         await product.save();
         await logActivity({
@@ -579,6 +659,161 @@ router.post('/bulk-delete', async (req, res) => {
     const result = await Product.deleteMany({ _id: { $in: ids } });
     res.json({ deletedCount: result.deletedCount });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/products/batch/:batchId/quantity - update batch quantity by adding/removing individual products
+router.put('/batch/:batchId/quantity', async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const { quantityChange, pricePerUnit } = req.body;
+    const facilityId = req.headers['x-facility-id'];
+    
+    if (!facilityId) {
+      return res.status(400).json({ error: 'Facility ID is required' });
+    }
+
+    // Find existing products in the batch
+    const existingProducts = await Product.find({ batchId, facilityId });
+    
+    if (existingProducts.length === 0) {
+      return res.status(404).json({ error: 'Batch not found' });
+    }
+
+    const productName = existingProducts[0].name;
+    const productCategory = existingProducts[0].category;
+    
+    if (quantityChange > 0) {
+      // Add new individual products to the batch
+      const createdProducts = [];
+      
+      for (let i = 0; i < quantityChange; i++) {
+        const nextUnitNumber = existingProducts.length + i + 1;
+        const sku = `${batchId}-${String(nextUnitNumber).padStart(3, '0')}`;
+        
+        const productDoc = new Product({
+          name: productName,
+          sku,
+          batchId,
+          description: existingProducts[0].description || '',
+          facilityId,
+          category: productCategory,
+          quantity: 1,
+          initialQuantity: 1,
+          pricePerUnit: pricePerUnit || existingProducts[0].pricePerUnit,
+          totalPrice: pricePerUnit || existingProducts[0].pricePerUnit,
+          status: 'active',
+          createdBy: req.user?.username || 'system',
+          updatedBy: req.user?.username || 'system'
+        });
+
+        productDoc.addHistory('created', { 
+          batch: batchId,
+          quantity: 1,
+          unit: nextUnitNumber,
+          reason: 'batch_quantity_increase'
+        }, req.user?.username || 'system');
+
+        const createdProduct = await productDoc.save();
+        createdProducts.push(createdProduct);
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Added ${quantityChange} products to batch ${batchId}`,
+        createdProducts 
+      });
+      
+    } else if (quantityChange < 0) {
+      // Remove individual products from the batch (FIFO - remove oldest first)
+      const productsToRemove = existingProducts
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+        .slice(0, Math.abs(quantityChange));
+      
+      const removeIds = productsToRemove.map(p => p._id);
+      await Product.deleteMany({ _id: { $in: removeIds } });
+      
+      res.json({ 
+        success: true, 
+        message: `Removed ${Math.abs(quantityChange)} products from batch ${batchId}`,
+        removedCount: productsToRemove.length
+      });
+      
+    } else {
+      res.json({ 
+        success: true, 
+        message: 'No quantity change requested' 
+      });
+    }
+    
+  } catch (err) {
+    console.error('Error updating batch quantity:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/products/batch/:batchId/price - update price for all products in a batch
+router.put('/batch/:batchId/price', async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const { pricePerUnit } = req.body;
+    const facilityId = req.headers['x-facility-id'];
+    
+    if (!facilityId) {
+      return res.status(400).json({ error: 'Facility ID is required' });
+    }
+
+    const result = await Product.updateMany(
+      { batchId, facilityId },
+      { 
+        pricePerUnit: pricePerUnit,
+        totalPrice: pricePerUnit,
+        updatedBy: req.user?.username || 'system',
+        updatedAt: new Date()
+      }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Batch not found' });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `Updated price for ${result.modifiedCount} products in batch ${batchId}`,
+      updatedCount: result.modifiedCount
+    });
+    
+  } catch (err) {
+    console.error('Error updating batch price:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/products/batch/:batchId - delete entire batch
+router.delete('/batch/:batchId', async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const facilityId = req.headers['x-facility-id'];
+    
+    if (!facilityId) {
+      return res.status(400).json({ error: 'Facility ID is required' });
+    }
+
+    const result = await Product.deleteMany({ batchId, facilityId });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Batch not found' });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `Deleted batch ${batchId} with ${result.deletedCount} products`,
+      deletedCount: result.deletedCount
+    });
+    
+  } catch (err) {
+    console.error('Error deleting batch:', err);
     res.status(500).json({ error: err.message });
   }
 });

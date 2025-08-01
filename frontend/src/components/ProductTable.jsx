@@ -3,11 +3,12 @@ import React from 'react';
 const ProductTable = ({ 
   products, 
   onProductSelect, 
-  onEditProduct, 
-  onDeleteProduct, 
   onBatchSelect,
   sorting,
-  onSortChange 
+  onSortChange,
+  isSelectMode = false,
+  selectedProducts = [],
+  onProductSelection
 }) => {
   const handleSort = (field) => {
     const newOrder = sorting.sortBy === field && sorting.sortOrder === 'asc' ? 'desc' : 'asc';
@@ -35,7 +36,7 @@ const ProductTable = ({
   };
 
   const getStockStatus = (product) => {
-    const totalQuantity = product.batches?.reduce((sum, batch) => sum + batch.quantity, 0) || product.quantity || 0;
+    const totalQuantity = product.totalQuantity || product.batches?.reduce((sum, batch) => sum + batch.quantity, 0) || product.quantity || 0;
     const minimumStock = product.minimumStock || 0;
     
     if (totalQuantity === 0) return { status: 'out-of-stock', text: 'Out of Stock', color: 'text-red-600 bg-red-50' };
@@ -83,6 +84,26 @@ const ProductTable = ({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
+              {isSelectMode && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <input
+                    type="checkbox"
+                    checked={selectedProducts.length === products.length && products.length > 0}
+                    onChange={(e) => {
+                      products.forEach(product => {
+                        const isSelected = e.target.checked;
+                        const alreadySelected = selectedProducts.includes(product._id);
+                        if (isSelected && !alreadySelected) {
+                          onProductSelection(product._id, true);
+                        } else if (!isSelected && alreadySelected) {
+                          onProductSelection(product._id, false);
+                        }
+                      });
+                    }}
+                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                  />
+                </th>
+              )}
               <th
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('name')}
@@ -128,19 +149,26 @@ const ProductTable = ({
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Batches
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {products.map((product) => {
+            {products.map((product, index) => {
               const stockStatus = getStockStatus(product);
-              const totalQuantity = product.batches?.reduce((sum, batch) => sum + batch.quantity, 0) || product.quantity || 0;
+              const totalQuantity = product.totalQuantity || product.batches?.reduce((sum, batch) => sum + batch.quantity, 0) || product.quantity || 0;
               const expiringBatches = getExpiringBatches(product.batches);
               
               return (
-                <tr key={product._id} className="hover:bg-gray-50">
+                <tr key={`${product._id || product.name || 'product'}-${index}`} className="hover:bg-gray-50">
+                  {isSelectMode && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedProducts.includes(product._id)}
+                        onChange={(e) => onProductSelection(product._id, e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                      />
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div>
@@ -160,7 +188,7 @@ const ProductTable = ({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 font-mono">
-                      {product.sku || 'N/A'}
+                      {product.skuPrefix || product.sku || 'N/A'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -170,8 +198,18 @@ const ProductTable = ({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      <span className="font-semibold">{totalQuantity}</span>
+                      <span className="font-semibold">{product.totalQuantity || product.quantity || 0}</span>
                       {product.unit && <span className="text-gray-500 ml-1">{product.unit}</span>}
+                      {product.isBatch && product.individualProducts && (
+                        <div className="text-xs text-gray-500">
+                          ({product.individualProducts.length} items in batch)
+                        </div>
+                      )}
+                      {product.batchInfo && product.batchInfo !== 'Individual Item' && (
+                        <div className="text-xs text-blue-600">
+                          Batch: {product.batchInfo}
+                        </div>
+                      )}
                     </div>
                     {product.minimumStock && (
                       <div className="text-xs text-gray-500">
@@ -181,8 +219,16 @@ const ProductTable = ({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
-                      {formatPrice(product.price)}
+                      {product.pricePerUnit ? `$${product.pricePerUnit.toFixed(2)}` : formatPrice(product.price)}
+                      {product.pricePerUnit && (
+                        <span className="text-xs text-gray-500 ml-1">per unit</span>
+                      )}
                     </div>
+                    {product.totalPrice && (
+                      <div className="text-xs text-gray-500">
+                        Total: ${product.totalPrice.toFixed(2)}
+                      </div>
+                    )}
                     {product.price?.cost && (
                       <div className="text-xs text-gray-500">
                         Cost: ${product.price.cost.toFixed(2)}
@@ -197,53 +243,19 @@ const ProductTable = ({
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-1">
                       <span className="text-sm text-gray-900">
-                        {product.batches?.length || 0}
+                        {product.individualProducts ? 1 : (product.batches?.length || 0)}
                       </span>
+                      {product.batchId && (
+                        <div className="text-xs text-gray-500 font-mono">
+                          {product.batchId}
+                        </div>
+                      )}
                       {expiringBatches > 0 && (
                         <span className="inline-flex px-1.5 py-0.5 text-xs font-medium rounded bg-red-100 text-red-800">
                           {expiringBatches} exp.
                         </span>
                       )}
-                      {product.batches?.length > 0 && (
-                        <button
-                          onClick={() => onBatchSelect(product)}
-                          className="text-blue-600 hover:text-blue-900 text-xs font-medium"
-                        >
-                          Manage
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-2">
-                      <button
-                        onClick={() => onProductSelect(product)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="View Details"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => onEditProduct(product)}
-                        className="text-indigo-600 hover:text-indigo-900"
-                        title="Edit Product"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => onDeleteProduct(product._id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete Product"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+
                     </div>
                   </td>
                 </tr>

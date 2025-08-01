@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facility-Feature Integration Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 1rem;
+            font-size: 2.5rem;
+        }
+        .subtitle {
+            text-align: center;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+        .test-links {
+            display: grid;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        .test-link {
+            display: block;
+            padding: 1rem 1.5rem;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            text-decoration: none;
+            color: white;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+        .test-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        .test-link-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+        .test-link-desc {
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+        .features {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .features h3 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+        }
+        .features ul {
+            margin: 0;
+            padding-left: 1.5rem;
+        }
+        .features li {
+            margin-bottom: 0.5rem;
+            opacity: 0.9;
+        }
+        .status {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-left: 0.5rem;
+        }
+        .status.working { background: rgba(34, 197, 94, 0.3); border: 1px solid rgba(34, 197, 94, 0.5); }
+        .status.testing { background: rgba(251, 191, 36, 0.3); border: 1px solid rgba(251, 191, 36, 0.5); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 Facility-Feature Integration</h1>
+        <p class="subtitle">
+            Test the connection between Facility Switcher and Feature Toggle Admin
+        </p>
+
+        <div class="test-links">
+            <a href="http://localhost:5173/facility-feature-demo" class="test-link">
+                <div class="test-link-title">🧪 Integration Demo Page</div>
+                <div class="test-link-desc">
+                    Complete demonstration with facility switcher and feature admin side-by-side
+                </div>
+                <span class="status working">✅ Ready</span>
+            </a>
+
+            <a href="http://localhost:5173/admin/features" class="test-link">
+                <div class="test-link-title">⚙️ Feature Toggle Admin</div>
+                <div class="test-link-desc">
+                    Direct access to feature administration (switch facilities using sidebar)
+                </div>
+                <span class="status working">✅ Connected</span>
+            </a>
+
+            <a href="http://localhost:5173/feature-matrix" class="test-link">
+                <div class="test-link-title">📊 Feature Matrix Table</div>
+                <div class="test-link-desc">
+                    View the complete facility-feature compatibility matrix
+                </div>
+                <span class="status working">✅ Available</span>
+            </a>
+
+            <a href="http://localhost:5173/dashboard" class="test-link">
+                <div class="test-link-title">🏠 Main Dashboard</div>
+                <div class="test-link-desc">
+                    Access the main app with sidebar facility switcher
+                </div>
+                <span class="status working">✅ Integrated</span>
+            </a>
+        </div>
+
+        <div class="features">
+            <h3>🚀 Integration Features Implemented:</h3>
+            <ul>
+                <li>✅ Facility Switcher connected to Feature Toggle Admin</li>
+                <li>✅ Automatic feature adjustment when facility changes</li>
+                <li>✅ Core features auto-enabled for each facility type</li>
+                <li>✅ Unavailable features auto-disabled/hidden</li>
+                <li>✅ Real-time visual feedback in feature admin</li>
+                <li>✅ Console logging of feature adjustments</li>
+                <li>✅ Facility-specific feature matrix logic</li>
+                <li>✅ Persistent facility selection across page reloads</li>
+            </ul>
+        </div>
+
+        <div class="features">
+            <h3>🧪 How to Test:</h3>
+            <ul>
+                <li>1. Open the <strong>Integration Demo Page</strong> above</li>
+                <li>2. Use the facility switcher to change between facility types</li>
+                <li>3. Watch the feature toggles automatically adjust below</li>
+                <li>4. Check the browser console for adjustment logs</li>
+                <li>5. Try switching between warehouse, retail, financial-hub</li>
+                <li>6. Notice core features are locked (cannot be disabled)</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

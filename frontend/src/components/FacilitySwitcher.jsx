@@ -21,7 +21,7 @@ const FacilitySwitcher = ({ currentFacilityId, onFacilityChange }) => {
   const fetchFacilities = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/facilities');
+      const response = await fetch('http://localhost:5000/api/facilities');
       if (!response.ok) {
         throw new Error('Failed to fetch facilities');
       }

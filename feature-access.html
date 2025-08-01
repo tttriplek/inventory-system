@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature Matrix - Quick Access</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        .nav-link {
+            padding: 12px 24px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .nav-link:hover {
+            background: #0056b3;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .feature-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        .feature-title {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 10px;
+        }
+        .status-indicator {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .core { background: #d4edda; color: #155724; }
+        .optional { background: #fff3cd; color: #856404; }
+        .unavailable { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎛️ Revolutionary Inventory System - Feature Access</h1>
+        
+        <div class="nav-links">
+            <a href="http://localhost:3002/feature-matrix" class="nav-link" target="_blank">
+                📊 View Feature Matrix Table
+            </a>
+            <a href="http://localhost:3002/admin/features" class="nav-link" target="_blank">
+                ⚙️ Feature Toggle Admin
+            </a>
+            <a href="http://localhost:3002/dashboard" class="nav-link" target="_blank">
+                🏠 Main Dashboard
+            </a>
+        </div>
+
+        <div class="info-box">
+            <h3>✅ What's Been Implemented:</h3>
+            <ul>
+                <li><strong>Comprehensive Feature Matrix Table</strong> - Visual table showing all features across 8 facility types</li>
+                <li><strong>Enhanced Feature Toggle Admin</strong> - Smart restrictions with facility-aware controls</li>
+                <li><strong>Core Feature Protection</strong> - Core features are locked and cannot be disabled</li>
+                <li><strong>Intelligent Filtering</strong> - Unavailable features are hidden for specific facility types</li>
+                <li><strong>Professional UI</strong> - Color-coded indicators and responsive design</li>
+            </ul>
+        </div>
+
+        <div class="info-box">
+            <h3>🎯 Feature Availability System:</h3>
+            <div class="feature-list">
+                <div class="feature-card">
+                    <div class="feature-title">✅ Core Features</div>
+                    <span class="status-indicator core">Always Enabled</span>
+                    <p>Essential features that cannot be disabled for specific facility types. These appear locked in the admin interface.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-title">🟡 Optional Features</div>
+                    <span class="status-indicator optional">Can Toggle</span>
+                    <p>Features that can be enabled or disabled based on facility needs. Full toggle control available.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-title">❌ Unavailable Features</div>
+                    <span class="status-indicator unavailable">Hidden</span>
+                    <p>Features not compatible with specific facility types. These are hidden from the admin interface.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <h3>🏢 Supported Facility Types:</h3>
+            <div class="feature-list">
+                <div class="feature-card"><strong>🏭 Warehouse</strong> - Basic storage and distribution</div>
+                <div class="feature-card"><strong>🏪 Retail</strong> - Customer-facing store operations</div>
+                <div class="feature-card"><strong>🚚 Distribution</strong> - Logistics and shipping hubs</div>
+                <div class="feature-card"><strong>🏭 Manufacturing</strong> - Production facilities</div>
+                <div class="feature-card"><strong>🔄 Hybrid</strong> - Multi-purpose facilities</div>
+                <div class="feature-card"><strong>💰 Financial Hub</strong> - Finance-focused operations</div>
+                <div class="feature-card"><strong>🏢 Enterprise Warehouse</strong> - Large-scale storage</div>
+                <div class="feature-card"><strong>🏬 Enterprise Retail</strong> - Large retail operations</div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <h3>🚀 Quick Testing:</h3>
+            <ol>
+                <li>Click "View Feature Matrix Table" to see the comprehensive compatibility matrix</li>
+                <li>Click "Feature Toggle Admin" to test the smart toggle restrictions</li>
+                <li>Try changing facility types to see how feature availability changes</li>
+                <li>Notice how core features are locked and unavailable features are hidden</li>
+            </ol>
+        </div>
+    </div>
+</body>
+</html>

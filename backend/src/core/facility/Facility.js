@@ -29,9 +29,22 @@ const facilitySchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: {
-      values: ['warehouse', 'retail', 'distribution', 'manufacturing', 'hybrid'],
+      values: ['warehouse', 'retail', 'distribution', 'manufacturing', 'hybrid', 'financial-hub', 'custom'],
       message: 'Invalid facility type'
     }
+  },
+
+  // Facility Key - for feature management across facilities
+  facilityKey: {
+    type: String,
+    required: true,
+    index: true
+  },
+
+  // Whether this is a custom facility (unique key) or standard type (shared key)
+  isCustomFacility: {
+    type: Boolean,
+    default: false
   },
 
   // Location & Contact
@@ -134,6 +147,75 @@ const facilitySchema = new mongoose.Schema({
       iotIntegration: { type: Boolean, default: false },
       aiPredictions: { type: Boolean, default: false },
       blockchainTracking: { type: Boolean, default: false }
+    },
+
+    // Storage Designer Features
+    storageDesigner: {
+      enabled: { type: Boolean, default: true },
+      layoutDesign: { type: Boolean, default: true },
+      utilizationTracking: { type: Boolean, default: true },
+      spaceOptimization: { type: Boolean, default: true }
+    },
+
+    // Enterprise Features
+    'smart-notifications': {
+      enabled: { type: Boolean, default: false },
+      channels: {
+        email: { type: Boolean, default: true },
+        sms: { type: Boolean, default: false },
+        push: { type: Boolean, default: true },
+        slack: { type: Boolean, default: false }
+      },
+      realTimeAlerts: { type: Boolean, default: true },
+      digestReports: { type: Boolean, default: true }
+    },
+
+    'financial-tracking': {
+      enabled: { type: Boolean, default: false },
+      realTimeValuation: { type: Boolean, default: true },
+      costAnalysis: { type: Boolean, default: true },
+      profitability: { type: Boolean, default: true },
+      budgetTracking: { type: Boolean, default: true }
+    },
+
+    'multi-currency-support': {
+      enabled: { type: Boolean, default: false },
+      baseCurrency: { type: String, default: 'USD' },
+      supportedCurrencies: [{ type: String }],
+      autoConversion: { type: Boolean, default: true },
+      rateUpdateFrequency: { type: String, default: 'daily' }
+    },
+
+    'cost-analysis': {
+      enabled: { type: Boolean, default: false },
+      detailedBreakdown: { type: Boolean, default: true },
+      trendAnalysis: { type: Boolean, default: true },
+      benchmarking: { type: Boolean, default: true },
+      forecastAccuracy: { type: Boolean, default: true }
+    },
+
+    'security-compliance': {
+      enabled: { type: Boolean, default: false },
+      accessLogging: { type: Boolean, default: true },
+      dataEncryption: { type: Boolean, default: true },
+      complianceReporting: { type: Boolean, default: true },
+      riskAssessment: { type: Boolean, default: true }
+    },
+
+    'insurance-integration': {
+      enabled: { type: Boolean, default: false },
+      coverageTracking: { type: Boolean, default: true },
+      claimsManagement: { type: Boolean, default: true },
+      riskAssessment: { type: Boolean, default: true },
+      premiumCalculation: { type: Boolean, default: true }
+    },
+
+    'audit-trails': {
+      enabled: { type: Boolean, default: false },
+      detailedLogging: { type: Boolean, default: true },
+      complianceReporting: { type: Boolean, default: true },
+      userActivityTracking: { type: Boolean, default: true },
+      dataIntegrityChecks: { type: Boolean, default: true }
     }
   },
 
@@ -207,6 +289,26 @@ facilitySchema.pre('save', function(next) {
     this.code = this.name.substring(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, '');
   }
   
+  // Generate facility key based on type
+  if (!this.facilityKey) {
+    if (this.type === 'custom' || this.isCustomFacility) {
+      // Custom facilities get unique keys
+      this.facilityKey = `custom_${this._id || new mongoose.Types.ObjectId()}`;
+      this.isCustomFacility = true;
+    } else {
+      // Standard facility types share keys
+      const standardKeys = {
+        'warehouse': 'facility_warehouse',
+        'retail': 'facility_retail', 
+        'distribution': 'facility_distribution',
+        'manufacturing': 'facility_manufacturing',
+        'hybrid': 'facility_hybrid'
+      };
+      this.facilityKey = standardKeys[this.type] || 'facility_default';
+      this.isCustomFacility = false;
+    }
+  }
+  
   // Ensure at least basic features are enabled
   if (!this.features.productManagement.enabled && !this.features.inventory.enabled) {
     return next(new Error('At least Product Management or Inventory must be enabled'));
@@ -221,8 +323,12 @@ facilitySchema.methods.isFeatureEnabled = function(featurePath) {
   let current = this.features;
   
   for (const key of keys) {
-    if (!current[key]) return false;
-    current = current[key];
+    // Handle both dot notation and bracket notation for hyphenated keys
+    if (current && typeof current === 'object' && current.hasOwnProperty(key)) {
+      current = current[key];
+    } else {
+      return false;
+    }
   }
   
   return current === true;

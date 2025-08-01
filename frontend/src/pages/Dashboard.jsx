@@ -60,7 +60,8 @@ const Dashboard = () => {
         }
       });
       if (response.ok) {
-        const products = await response.json();
+        const data = await response.json();
+        const products = Array.isArray(data) ? data : [];
         const lowStockThreshold = 20;
         const lowStockProducts = products.filter(p => p.quantity <= lowStockThreshold);
         

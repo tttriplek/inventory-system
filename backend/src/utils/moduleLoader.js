@@ -127,11 +127,16 @@ class ModuleLoader {
       // Map module names to feature paths
       const featureMap = {
         'products': 'productManagement.enabled',
-        'inventory': 'inventory.enabled',
+        'inventory': 'inventory.enabled', 
         'expiry': 'expiryTracking.enabled',
         'temperature': 'temperatureMonitoring.enabled',
         'sections': 'sectionManagement.enabled',
-        'analytics': 'analytics.enabled'
+        'analytics': 'analytics.enabled',
+        'storage': 'storageDesigner.enabled',
+        // Enterprise features
+        'notifications': 'smart-notifications.enabled',
+        'financial': 'financial-tracking.enabled', 
+        'audit': 'audit-trails.enabled'
       };
 
       const featurePath = featureMap[featureName];
@@ -140,7 +145,11 @@ class ModuleLoader {
         return true; // Allow access if no mapping found
       }
 
-      return await FacilityService.isFeatureEnabled(facilityId, featurePath);
+      console.log(`[DEBUG] Checking feature: ${featureName} -> ${featurePath} for facility: ${facilityId}`);
+      const result = await FacilityService.isFeatureEnabled(facilityId, featurePath);
+      console.log(`[DEBUG] Feature check result: ${result}`);
+
+      return result;
       
     } catch (error) {
       logger.error(`Error checking feature status for ${featureName}:`, error);

@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useFacility } from '../contexts/FacilityContext';
 
 const ProductForm = ({ product, onSubmit, onCancel, hideHeader = false }) => {
+  // Product suggestions state
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestion, setSelectedSuggestion] = useState(null);
+  const { currentFacility } = useFacility();
   const [formData, setFormData] = useState({
     name: '',
-    sku: '',
     description: '',
     category: {
       primary: '',
@@ -19,13 +24,6 @@ const ProductForm = ({ product, onSubmit, onCancel, hideHeader = false }) => {
     quantity: 0,
     reorderLevel: 0,
     maxStockLevel: 1000,
-    location: {
-      warehouse: '',
-      zone: '',
-      aisle: '',
-      shelf: '',
-      bin: ''
-    },
     specifications: {
       weight: '',
       dimensions: {
@@ -78,7 +76,6 @@ const ProductForm = ({ product, onSubmit, onCancel, hideHeader = false }) => {
     if (product) {
       setFormData({
         name: product.name || '',
-        sku: product.sku || '',
         description: product.description || '',
         category: {
           primary: product.category?.primary || product.category || '',
@@ -94,13 +91,6 @@ const ProductForm = ({ product, onSubmit, onCancel, hideHeader = false }) => {
         quantity: product.quantity || 0,
         reorderLevel: product.reorderLevel || product.minimumStock || 0,
         maxStockLevel: product.maxStockLevel || product.maximumStock || 1000,
-        location: {
-          warehouse: product.location?.warehouse || '',
-          zone: product.location?.zone || '',
-          aisle: product.location?.aisle || '',
-          shelf: product.location?.shelf || '',
-          bin: product.location?.bin || ''
-        },
         specifications: {
           weight: product.specifications?.weight || '',
           dimensions: {
@@ -147,8 +137,74 @@ const ProductForm = ({ product, onSubmit, onCancel, hideHeader = false }) => {
     }
   }, [product]);
 
+  // Fetch product suggestions based on name input
+  const fetchSuggestions = async (name) => {
+    if (!name || name.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    try {
+      const facilityId = currentFacility?._id || currentFacility?.id;
+      if (!facilityId) return;
+
+      const response = await fetch(`http://localhost:5000/api/products/suggestions?name=${encodeURIComponent(name)}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Facility-ID': facilityId
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data.length > 0) {
+          setSuggestions(data.data);
+          setShowSuggestions(true);
+        } else {
+          setSuggestions([]);
+          setShowSuggestions(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  // Apply suggestion to form
+  const applySuggestion = (suggestion) => {
+    setFormData(prev => ({
+      ...prev,
+      name: suggestion.name,
+      category: {
+        ...prev.category,
+        primary: suggestion.category || prev.category.primary
+      },
+      pricing: {
+        ...prev.pricing,
+        sellingPrice: suggestion.pricePerUnit || prev.pricing.sellingPrice
+      }
+    }));
+    setSelectedSuggestion(suggestion);
+    setShowSuggestions(false);
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    // Handle product name with suggestions
+    if (name === 'name') {
+      setFormData(prev => ({ ...prev, [name]: value }));
+      
+      // Fetch suggestions for similar product names
+      const timeoutId = setTimeout(() => {
+        fetchSuggestions(value);
+      }, 300); // Debounce
+      
+      return () => clearTimeout(timeoutId);
+    }
     
     if (name.includes('.')) {
       const keys = name.split('.');
@@ -203,11 +259,7 @@ const ProductForm = ({ product, onSubmit, onCancel, hideHeader = false }) => {
     if (!formData.name.trim()) {
       newErrors.name = 'Product name is required';
     }
-    
-    if (!formData.sku.trim()) {
-      newErrors.sku = 'SKU is required';
-    }
-    
+
     if (!formData.category.primary.trim()) {
       newErrors.category = 'Category is required';
     }
@@ -240,24 +292,23 @@ const ProductForm = ({ product, onSubmit, onCancel, hideHeader = false }) => {
       // Transform the form data to match backend expectations
       const backendData = {
         name: formData.name.trim(),
-        sku: formData.sku.trim(),
-        category: formData.category.primary.trim(),
+        category: {
+          primary: formData.category.primary.trim(),
+          secondary: formData.category.secondary?.trim() || '',
+          tags: formData.category.tags || []
+        },
         quantity: parseInt(formData.quantity) || 0,
-        pricePerUnit: parseFloat(formData.pricing.sellingPrice) || 0,
-        description: formData.description.trim(),
-        unit: formData.unit,
-        // Optional nested fields that the backend supports
-        origin: {
-          supplier: formData.suppliers.length > 0 ? formData.suppliers[0] : ''
+        pricing: {
+          cost: parseFloat(formData.pricing.cost) || 0,
+          sellingPrice: parseFloat(formData.pricing.sellingPrice) || 0,
+          pricePerUnit: parseFloat(formData.pricing.sellingPrice) || 0,
+          currency: formData.pricing.currency || 'USD'
         },
-        placement: {
-          section: formData.location.warehouse || ''
-        },
-        // Additional data that might be used by the backend
-        specifications: formData.specifications,
-        compliance: formData.compliance,
-        nutrition: formData.nutrition
+        description: formData.description?.trim() || ''
       };
+      
+      console.log('Frontend form data:', formData);
+      console.log('Transformed backend data:', backendData);
       
       await onSubmit(backendData);
     } catch (error) {
@@ -294,34 +345,53 @@ const ProductForm = ({ product, onSubmit, onCancel, hideHeader = false }) => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Product Name *
               </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.name ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Enter product name"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    errors.name ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                  placeholder="Enter product name"
+                />
+                
+                {/* Product Name Suggestions */}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    <div className="p-2 text-xs text-gray-500 border-b">
+                      💡 Similar products found. Click to use existing product data:
+                    </div>
+                    {suggestions.map((suggestion, index) => (
+                      <div
+                        key={index}
+                        onClick={() => applySuggestion(suggestion)}
+                        className="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-medium text-gray-900">{suggestion.name}</div>
+                            <div className="text-sm text-gray-600">
+                              SKU: {suggestion.skuPrefix}-XXX | Category: {suggestion.category}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              Current stock: {suggestion.totalQuantity} units | Price: ${suggestion.pricePerUnit}
+                            </div>
+                          </div>
+                          <div className="text-xs text-blue-600">Click to use</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                SKU *
-              </label>
-              <input
-                type="text"
-                name="sku"
-                value={formData.sku}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.sku ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Enter SKU"
-              />
-              {errors.sku && <p className="mt-1 text-sm text-red-600">{errors.sku}</p>}
+              {selectedSuggestion && (
+                <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">
+                  ✅ Using data from existing product: {selectedSuggestion.name}
+                </div>
+              )}
             </div>
 
             <div className="md:col-span-2">
@@ -336,6 +406,10 @@ const ProductForm = ({ product, onSubmit, onCancel, hideHeader = false }) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter product description"
               />
+            </div>
+
+            <div className="text-sm text-gray-500 md:col-span-2">
+              <p>💡 SKU will be auto-generated based on product name and batch</p>
             </div>
 
             <div>
@@ -466,68 +540,6 @@ const ProductForm = ({ product, onSubmit, onCancel, hideHeader = false }) => {
                 min="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="1000"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Location */}
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Storage Location</h3>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Warehouse</label>
-              <input
-                type="text"
-                name="location.warehouse"
-                value={formData.location.warehouse}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="A"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Zone</label>
-              <input
-                type="text"
-                name="location.zone"
-                value={formData.location.zone}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="1"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Aisle</label>
-              <input
-                type="text"
-                name="location.aisle"
-                value={formData.location.aisle}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="A1"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Shelf</label>
-              <input
-                type="text"
-                name="location.shelf"
-                value={formData.location.shelf}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="S1"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bin</label>
-              <input
-                type="text"
-                name="location.bin"
-                value={formData.location.bin}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="B1"
               />
             </div>
           </div>

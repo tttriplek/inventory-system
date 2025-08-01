@@ -8,6 +8,22 @@ const express = require('express');
 const router = express.Router();
 const { featureManager, FEATURE_DEFINITIONS, FEATURE_CATEGORIES } = require('../services/FeatureManager');
 
+// GET /api/features/definitions - Get feature definitions only
+router.get('/definitions', (req, res) => {
+  try {
+    res.json({
+      success: true,
+      features: Object.values(FEATURE_DEFINITIONS)
+    });
+  } catch (error) {
+    console.error('Error getting feature definitions:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to get feature definitions' 
+    });
+  }
+});
+
 // GET /api/features - Get all feature definitions and categories
 router.get('/', (req, res) => {
   try {
